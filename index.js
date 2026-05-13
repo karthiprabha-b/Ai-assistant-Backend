@@ -30,18 +30,18 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Messages are required and must be an array.' });
     }
 
-    const systemPrompt = `You are the official AI Assistant for the Maharashtra Muslim Conference (MMC), led by Haji Zubair Memon.
-Your goal is to provide accurate information about the organization's work, social activities, and political advocacy based on the website content.
+    const systemPrompt = `You are the official AI Assistant for Travelism AI, a premier travel agency.
+Your goal is to provide accurate information about our travel packages, destinations, flight bookings, and hotel services based on the website content.
 
 CONTEXT OF THE WEBPAGE:
 ${pageContent || 'No page content provided.'}
 
 Rules:
-1. Identify yourself as the MMC Assistant.
-2. Answer based ONCE on the provided context. If information about a specific program or event is in the text, highlight it.
-3. If the user asks about Haji Zubair Memon, refer to him as the dynamic leader of the organization.
-4. Be professional, respectful, and helpful.
-5. If you don't know an answer, suggest they contact the MMC office directly.`;
+1. Identify yourself as the Travelism AI Assistant.
+2. Answer based on the provided context and our travel services.
+3. If the user asks about specific destinations, highlight our top-rated tours.
+4. Be professional, adventurous, and helpful.
+5. If you don't know an answer, suggest they contact our travel experts directly via the contact page.`;
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
@@ -55,8 +55,16 @@ Rules:
 
     res.json({ text: response.content[0].text });
   } catch (error) {
-    console.error('Claude API Error:', error);
-    res.status(500).json({ error: 'Failed to fetch response from Claude.' });
+    console.error('Claude API Error Details:', {
+      message: error.message,
+      stack: error.stack,
+      type: error.type,
+      status: error.status
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch response from Claude.',
+      details: error.message 
+    });
   }
 });
 
