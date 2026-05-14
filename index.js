@@ -64,10 +64,6 @@ app.post('/api/chat', async (req, res) => {
       Analyze the page content and the knowledge base above to answer the user's question accurately. If the answer isn't directly in the text, use your intelligence to provide a professional response that aligns with the brand's voice.
     `.trim();
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 1024,
-      system: systemPrompt,
     // Anthropic requires the first message to be 'user'. 
     // We filter out any initial 'assistant' greeting messages.
     const filteredMessages = messages
