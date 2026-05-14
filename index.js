@@ -25,6 +25,9 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// For verification (Logs to Render Console only)
+console.log('API Key Check:', process.env.ANTHROPIC_API_KEY ? `Starts with: ${process.env.ANTHROPIC_API_KEY.substring(0, 10)}...` : 'MISSING!');
+
 app.get('/', (req, res) => res.send('BotSaaS (Render) Backend is Running!'));
 
 app.post('/api/chat', async (req, res) => {
