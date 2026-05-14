@@ -16,6 +16,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Version Test Endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ status: 'Live', version: '2.0', message: 'Model fallback logic is active.' });
+});
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
