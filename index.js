@@ -78,12 +78,38 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'No user messages found.' });
     }
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: finalMessages,
-    });
+    // List of models to try in order of quality
+    const modelsToTry = [
+      'claude-3-5-sonnet-20240620',
+      'claude-3-haiku-20240307',
+      'claude-2.1',
+      'claude-2.0'
+    ];
+
+    let response = null;
+    let lastError = null;
+
+    for (const modelId of modelsToTry) {
+      try {
+        console.log(`Trying model: ${modelId}`);
+        response = await anthropic.messages.create({
+          model: modelId,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: finalMessages,
+        });
+        if (response) break; // Success!
+      } catch (err) {
+        lastError = err;
+        if (err.status === 404) {
+          console.warn(`Model ${modelId} not found, trying next...`);
+          continue;
+        }
+        throw err; // If it's not a 404 (e.g. 401 Unauthorized), stop and throw
+      }
+    }
+
+    if (!response) throw lastError;
 
     const botReply = response.content[0].text;
 
