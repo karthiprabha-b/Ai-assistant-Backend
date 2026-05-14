@@ -65,7 +65,7 @@ app.post('/api/chat', async (req, res) => {
     `.trim();
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-sonnet-20240229',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 1024,
       system: systemPrompt,
       messages: messages.map(m => ({
@@ -88,10 +88,7 @@ app.post('/api/chat', async (req, res) => {
     res.json({ text: botReply });
   } catch (error) {
     console.error('Claude/Supabase Error:', error.message);
-    // Return the actual error message to the user for debugging
-    res.status(200).json({ 
-      text: `⚠️ AI Error: ${error.message}. Please check your API Key and credits on Anthropic Dashboard.` 
-    });
+    res.status(500).json({ error: 'AI Assistant is temporarily unavailable. Please try again later.' });
   }
 });
 
