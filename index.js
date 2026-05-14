@@ -26,7 +26,11 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { messages, pageContent, botId } = req.body;
     
-    // Fetch bot config from Supabase
+    if (!botId) return res.status(400).json({ error: 'Bot ID is required.' });
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Valid messages array is required.' });
+    }
+
     const { data: botConfig, error: botError } = await supabase
       .from('bots')
       .select('*')
@@ -37,9 +41,7 @@ app.post('/api/chat', async (req, res) => {
       return res.status(404).json({ error: 'Bot not found.' });
     }
 
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Messages are required.' });
-    }
+    const contextContent = pageContent || 'No page context available.';
 
     const systemPrompt = `
       You are a highly professional and expert AI assistant for the website: ${botConfig.website || 'this business'}.
@@ -56,7 +58,7 @@ app.post('/api/chat', async (req, res) => {
       
       LIVE PAGE CONTEXT:
       The user is currently looking at this part of the website:
-      ${pageContent}
+      ${contextContent}
       
       GOAL:
       Analyze the page content and the knowledge base above to answer the user's question accurately. If the answer isn't directly in the text, use your intelligence to provide a professional response that aligns with the brand's voice.
