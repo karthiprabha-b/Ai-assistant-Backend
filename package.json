@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "description": "",
-  "main": "netlify/functions/api.js",
+  "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,7 +17,6 @@
     "@supabase/supabase-js": "^2.105.4",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "serverless-http": "^4.0.0"
+    "express": "^5.2.1"
   }
 }
