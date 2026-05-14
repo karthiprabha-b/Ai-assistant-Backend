@@ -35,9 +35,6 @@ app.post('/api/chat', async (req, res) => {
     const { messages, pageContent, botId } = req.body;
     
     if (!botId) return res.status(400).json({ error: 'Bot ID is required.' });
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'Valid messages array is required.' });
-    }
 
     const { data: botConfig, error: botError } = await supabase
       .from('bots')
@@ -45,97 +42,38 @@ app.post('/api/chat', async (req, res) => {
       .eq('id', botId)
       .single();
 
-    if (botError || !botConfig) {
-      return res.status(404).json({ error: 'Bot not found.' });
-    }
-
-    const contextContent = pageContent || 'No page context available.';
+    if (botError || !botConfig) return res.status(404).json({ error: 'Bot not found.' });
 
     const systemPrompt = `
-      You are a highly professional and expert AI assistant for the website: ${botConfig.website || 'this business'}.
-      
-      TONE & PERSONALITY:
-      - Extremely professional, polite, and helpful.
-      - **CRITICAL MISSION**: Before you answer any of the user's questions or provide information, you MUST first collect their **Full Name**, **Email Address**, and **Phone Number**. 
-      - Do this naturally. For example: "I'd be happy to help you with that! First, may I know your name and email so we can stay in touch?"
-      - Once (and only once) you have all three pieces of information, proceed to answer their original question professionally.
-      
-      KNOWLEDGE BASE:
-      Below is the primary information about this business. Use this as your "source of truth":
-      ${botConfig.knowledge || 'No specific knowledge provided yet.'}
-      
-      LIVE PAGE CONTEXT:
-      The user is currently looking at this part of the website:
-      ${contextContent}
-      
-      GOAL:
-      Analyze the page content and the knowledge base above to answer the user's question accurately. If the answer isn't directly in the text, use your intelligence to provide a professional response that aligns with the brand's voice.
+      You are a professional AI assistant for ${botConfig.name}.
+      MISSION: Before answering questions, politely collect the user's Name, Email, and Phone.
+      BUSINESS INFO: ${botConfig.knowledge || ''}
+      PAGE CONTEXT: ${pageContent || ''}
     `.trim();
 
-    // Anthropic requires the first message to be 'user'. 
-    // We filter out any initial 'assistant' greeting messages.
-    const filteredMessages = messages
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => ({ role: m.role, content: m.content }));
-      
-    // Find the first 'user' message index
-    const firstUserIndex = filteredMessages.findIndex(m => m.role === 'user');
-    const finalMessages = firstUserIndex !== -1 ? filteredMessages.slice(firstUserIndex) : [];
-
-    if (finalMessages.length === 0) {
-      return res.status(400).json({ error: 'No user messages found.' });
-    }
-
-    // Use the '-latest' tags to ensure we hit active models in 2026
-    const modelsToTry = [
-      'claude-3-5-sonnet-latest',
-      'claude-3-sonnet-latest',
-      'claude-3-opus-latest',
-      'claude-3-haiku-latest'
-    ];
-
-    let response = null;
-    let lastError = null;
-
-    for (const modelId of modelsToTry) {
-      try {
-        console.log(`Trying model: ${modelId}`);
-        response = await anthropic.messages.create({
-          model: modelId,
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: finalMessages,
-        });
-        if (response) break; // Success!
-      } catch (err) {
-        lastError = err;
-        if (err.status === 404) {
-          console.warn(`Model ${modelId} not found, trying next...`);
-          continue;
-        }
-        throw err; // If it's not a 404 (e.g. 401 Unauthorized), stop and throw
-      }
-    }
-
-    if (!response) throw lastError;
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20240620',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
+        role: m.role,
+        content: m.content
+      }))
+    });
 
     const botReply = response.content[0].text;
 
-    // Save to logs in the background
+    // Background log
     supabase.from('chat_logs').insert({
       bot_id: botId,
       user_message: messages[messages.length - 1].content,
       bot_reply: botReply
-    }).then(({ error }) => {
-      if (error) console.error('Logging error:', error.message);
-    });
+    }).then(({ error }) => { if (error) console.error(error); });
 
     res.json({ text: botReply });
   } catch (error) {
-    console.error('Claude/Supabase Error:', error);
-    res.status(200).json({ 
-      text: `⚠️ DEBUG ERROR: ${error.message}. Type: ${error.type || 'unknown'}` 
-    });
+    console.error(error);
+    res.status(200).json({ text: `⚠️ AI Error: ${error.message}. Please check your API credits.` });
   }
 });
 
