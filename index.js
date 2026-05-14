@@ -41,23 +41,29 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Messages are required.' });
     }
 
-    const systemPrompt = `You are the official ${botConfig.name}.
-Your goal is to provide accurate information based on the website content and your specific knowledge base.
-
-SPECIFIC BOT KNOWLEDGE:
-${botConfig.knowledge || ''}
-
-CURRENT PAGE CONTEXT:
-${pageContent || 'No page content provided.'}
-
-Rules:
-1. Identify yourself as the ${botConfig.name}.
-2. Answer based on the provided knowledge and page context.
-3. If you don't know an answer, suggest they contact human support.
-4. Be professional and helpful.`;
+    const systemPrompt = `
+      You are a highly professional and expert AI assistant for the website: ${botConfig.website || 'this business'}.
+      
+      TONE & PERSONALITY:
+      - Extremely professional, polite, and helpful.
+      - Clear and concise in your explanations.
+      - Use proper formatting (bullet points, bold text) to make answers easy to read.
+      - Never say "I don't know" - instead, try to guide the user based on the context or suggest they contact support.
+      
+      KNOWLEDGE BASE:
+      Below is the primary information about this business. Use this as your "source of truth":
+      ${botConfig.knowledge || 'No specific knowledge provided yet.'}
+      
+      LIVE PAGE CONTEXT:
+      The user is currently looking at this part of the website:
+      ${pageContent}
+      
+      GOAL:
+      Analyze the page content and the knowledge base above to answer the user's question accurately. If the answer isn't directly in the text, use your intelligence to provide a professional response that aligns with the brand's voice.
+    `.trim();
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 1024,
       system: systemPrompt,
       messages: messages.map(m => ({
@@ -68,7 +74,7 @@ Rules:
 
     const botReply = response.content[0].text;
 
-    // Save to logs in the background (don't block the response)
+    // Save to logs in the background
     supabase.from('chat_logs').insert({
       bot_id: botId,
       user_message: messages[messages.length - 1].content,
@@ -84,9 +90,9 @@ Rules:
   }
 });
 
-// Bot CRUD via Supabase
+// Bots API
 app.get('/api/bots', async (req, res) => {
-  const { data, error } = await supabase.from('bots').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('bots').select('*');
   if (error) return res.status(500).json(error);
   res.json(data);
 });
@@ -100,8 +106,8 @@ app.post('/api/bots', async (req, res) => {
       name: bot.name,
       website: bot.website,
       color: bot.color,
-      icon_size: bot.iconSize || bot.icon_size,
-      knowledge: bot.context || bot.knowledge,
+      icon_size: bot.icon_size || bot.iconSize,
+      knowledge: bot.knowledge || bot.context,
       icon_url: bot.icon_url
     })
     .select();
@@ -125,6 +131,18 @@ app.get('/api/bots/:id/logs', async (req, res) => {
     
   if (error) return res.status(500).json(error);
   res.json(data);
+});
+
+app.delete('/api/logs/:id', async (req, res) => {
+  const { error } = await supabase.from('chat_logs').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json(error);
+  res.json({ success: true });
+});
+
+app.delete('/api/bots/:id/logs', async (req, res) => {
+  const { error } = await supabase.from('chat_logs').delete().eq('bot_id', req.params.id);
+  if (error) return res.status(500).json(error);
+  res.json({ success: true });
 });
 
 app.listen(port, () => {
