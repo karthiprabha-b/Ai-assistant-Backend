@@ -68,10 +68,25 @@ app.post('/api/chat', async (req, res) => {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 1024,
       system: systemPrompt,
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      })),
+    // Anthropic requires the first message to be 'user'. 
+    // We filter out any initial 'assistant' greeting messages.
+    const filteredMessages = messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role, content: m.content }));
+      
+    // Find the first 'user' message index
+    const firstUserIndex = filteredMessages.findIndex(m => m.role === 'user');
+    const finalMessages = firstUserIndex !== -1 ? filteredMessages.slice(firstUserIndex) : [];
+
+    if (finalMessages.length === 0) {
+      return res.status(400).json({ error: 'No user messages found.' });
+    }
+
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20240620',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: finalMessages,
     });
 
     const botReply = response.content[0].text;
@@ -87,8 +102,10 @@ app.post('/api/chat', async (req, res) => {
 
     res.json({ text: botReply });
   } catch (error) {
-    console.error('Claude/Supabase Error:', error.message);
-    res.status(500).json({ error: 'AI Assistant is temporarily unavailable. Please try again later.' });
+    console.error('Claude/Supabase Error:', error);
+    res.status(200).json({ 
+      text: `⚠️ DEBUG ERROR: ${error.message}. Type: ${error.type || 'unknown'}` 
+    });
   }
 });
 
