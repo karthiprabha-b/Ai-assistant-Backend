@@ -88,7 +88,10 @@ app.post('/api/chat', async (req, res) => {
     res.json({ text: botReply });
   } catch (error) {
     console.error('Claude/Supabase Error:', error.message);
-    res.status(500).json({ error: 'Failed to process request.', details: error.message });
+    // Return the actual error message to the user for debugging
+    res.status(200).json({ 
+      text: `⚠️ AI Error: ${error.message}. Please check your API Key and credits on Anthropic Dashboard.` 
+    });
   }
 });
 
