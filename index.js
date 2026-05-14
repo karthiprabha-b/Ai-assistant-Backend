@@ -86,12 +86,12 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'No user messages found.' });
     }
 
-    // List of models to try in order of quality
+    // Use the '-latest' tags to ensure we hit active models in 2026
     const modelsToTry = [
-      'claude-3-5-sonnet-20240620',
-      'claude-3-haiku-20240307',
-      'claude-2.1',
-      'claude-2.0'
+      'claude-3-5-sonnet-latest',
+      'claude-3-sonnet-latest',
+      'claude-3-opus-latest',
+      'claude-3-haiku-latest'
     ];
 
     let response = null;
