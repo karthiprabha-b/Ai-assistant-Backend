@@ -66,7 +66,18 @@ Rules:
       })),
     });
 
-    res.json({ text: response.content[0].text });
+    const botReply = response.content[0].text;
+
+    // Save to logs in the background (don't block the response)
+    supabase.from('chat_logs').insert({
+      bot_id: botId,
+      user_message: messages[messages.length - 1].content,
+      bot_reply: botReply
+    }).then(({ error }) => {
+      if (error) console.error('Logging error:', error.message);
+    });
+
+    res.json({ text: botReply });
   } catch (error) {
     console.error('Claude/Supabase Error:', error.message);
     res.status(500).json({ error: 'Failed to process request.', details: error.message });
@@ -89,8 +100,9 @@ app.post('/api/bots', async (req, res) => {
       name: bot.name,
       website: bot.website,
       color: bot.color,
-      icon_size: bot.iconSize,
-      knowledge: bot.context
+      icon_size: bot.iconSize || bot.icon_size,
+      knowledge: bot.context || bot.knowledge,
+      icon_url: bot.icon_url
     })
     .select();
   
@@ -102,6 +114,17 @@ app.delete('/api/bots/:id', async (req, res) => {
   const { error } = await supabase.from('bots').delete().eq('id', req.params.id);
   if (error) return res.status(500).json(error);
   res.json({ success: true });
+});
+
+app.get('/api/bots/:id/logs', async (req, res) => {
+  const { data, error } = await supabase
+    .from('chat_logs')
+    .select('*')
+    .eq('bot_id', req.params.id)
+    .order('created_at', { ascending: false });
+    
+  if (error) return res.status(500).json(error);
+  res.json(data);
 });
 
 app.listen(port, () => {
