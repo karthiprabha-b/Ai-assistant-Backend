@@ -32,48 +32,17 @@ app.get('/', (req, res) => res.send('BotSaaS (Render) Backend is Running!'));
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, pageContent, botId } = req.body;
+    const { messages, botId } = req.body;
     
-    if (!botId) return res.status(400).json({ error: 'Bot ID is required.' });
-
-    const { data: botConfig, error: botError } = await supabase
-      .from('bots')
-      .select('*')
-      .eq('id', botId)
-      .single();
-
-    if (botError || !botConfig) return res.status(404).json({ error: 'Bot not found.' });
-
-    const systemPrompt = `
-      You are a professional AI assistant for ${botConfig.name}.
-      MISSION: Before answering questions, politely collect the user's Name, Email, and Phone.
-      BUSINESS INFO: ${botConfig.knowledge || ''}
-      PAGE CONTEXT: ${pageContent || ''}
-    `.trim();
-
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
-        role: m.role,
-        content: m.content
-      }))
+      messages: messages.map(m => ({ role: m.role, content: m.content }))
     });
 
-    const botReply = response.content[0].text;
-
-    // Background log
-    supabase.from('chat_logs').insert({
-      bot_id: botId,
-      user_message: messages[messages.length - 1].content,
-      bot_reply: botReply
-    }).then(({ error }) => { if (error) console.error(error); });
-
-    res.json({ text: botReply });
+    res.json({ text: response.content[0].text });
   } catch (error) {
-    console.error(error);
-    res.status(200).json({ text: `⚠️ AI Error: ${error.message}. Please check your API credits.` });
+    res.status(200).json({ text: `⚠️ Error: ${error.message}` });
   }
 });
 
