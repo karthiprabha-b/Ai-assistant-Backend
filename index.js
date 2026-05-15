@@ -31,52 +31,39 @@ console.log('API Key Check:', process.env.ANTHROPIC_API_KEY ? `Starts with: ${pr
 app.get('/', (req, res) => res.send('BotSaaS (Render) Backend is Running!'));
 
 app.post('/api/chat', async (req, res) => {
+  const currentKey = process.env.ANTHROPIC_API_KEY || '';
+  const keyInfo = `${currentKey.substring(0, 7)}...${currentKey.substring(currentKey.length - 4)}`;
+  
   try {
     const { messages, pageContent, botId } = req.body;
     
-    if (!botId) return res.status(400).json({ error: 'Bot ID is required.' });
-
-    const { data: botConfig, error: botError } = await supabase
-      .from('bots').select('*').eq('id', botId).single();
-
-    if (botError || !botConfig) return res.status(404).json({ error: 'Bot not found.' });
+    // Initialize client inside the request to ensure latest ENV is used
+    const client = new Anthropic({ apiKey: currentKey });
 
     const instructions = `
-      You are a professional AI assistant for ${botConfig.name}.
-      CRITICAL MISSION: Before answering questions, naturally collect the user's Name, Email, and Phone.
-      BUSINESS KNOWLEDGE: ${botConfig.knowledge || ''}
-      CURRENT PAGE: ${pageContent || ''}
+      You are a professional AI assistant for ${botId}.
+      MISSION: Collect Name, Email, and Phone before answering.
+      KNOWLEDGE: ${pageContent || ''}
     `.trim();
 
-    // Move instructions into the first message to avoid "system" parameter issues
-    const finalMessages = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
-      role: m.role,
-      content: m.content
-    }));
-
-    if (finalMessages.length > 0 && finalMessages[0].role === 'user') {
-      finalMessages[0].content = `[INSTRUCTIONS: ${instructions}]\n\n${finalMessages[0].content}`;
-    }
-
-    const response = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+    const response = await client.messages.create({
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 1024,
-      messages: finalMessages
+      messages: [
+        { role: 'user', content: `[SYSTEM: ${instructions}]` },
+        ...messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      ]
     });
 
-    const botReply = response.content[0].text;
-
-    // Background log
-    supabase.from('chat_logs').insert({
-      bot_id: botId,
-      user_message: messages[messages.length - 1].content,
-      bot_reply: botReply
-    }).then(({ error }) => { if (error) console.error('Logging Error:', error); });
-
-    res.json({ text: botReply });
+    res.json({ text: response.content[0].text });
   } catch (error) {
-    console.error('Claude Error:', error);
-    res.status(200).json({ text: `⚠️ AI Service Error: ${error.message}. Please check your Anthropic API key/credits.` });
+    console.error('Final Debug:', error);
+    res.status(200).json({ 
+      text: `⚠️ Key Verify: [${keyInfo}] | Error: ${error.message}. If the key looks wrong, update Render ENV.` 
+    });
   }
 });
 
