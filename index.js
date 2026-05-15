@@ -41,21 +41,27 @@ app.post('/api/chat', async (req, res) => {
 
     if (botError || !botConfig) return res.status(404).json({ error: 'Bot not found.' });
 
-    const systemPrompt = `
+    const instructions = `
       You are a professional AI assistant for ${botConfig.name}.
       CRITICAL MISSION: Before answering questions, naturally collect the user's Name, Email, and Phone.
       BUSINESS KNOWLEDGE: ${botConfig.knowledge || ''}
       CURRENT PAGE: ${pageContent || ''}
     `.trim();
 
+    // Move instructions into the first message to avoid "system" parameter issues
+    const finalMessages = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    if (finalMessages.length > 0 && finalMessages[0].role === 'user') {
+      finalMessages[0].content = `[INSTRUCTIONS: ${instructions}]\n\n${finalMessages[0].content}`;
+    }
+
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
-        role: m.role,
-        content: m.content
-      }))
+      messages: finalMessages
     });
 
     const botReply = response.content[0].text;
