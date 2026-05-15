@@ -35,7 +35,7 @@ app.post('/api/chat', async (req, res) => {
     const { messages, botId } = req.body;
     
     const response = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-instant-1.2',
       max_tokens: 1024,
       messages: messages.map(m => ({ role: m.role, content: m.content }))
     });
