@@ -32,17 +32,45 @@ app.get('/', (req, res) => res.send('BotSaaS (Render) Backend is Running!'));
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, botId } = req.body;
+    const { messages, pageContent, botId } = req.body;
     
+    if (!botId) return res.status(400).json({ error: 'Bot ID is required.' });
+
+    const { data: botConfig, error: botError } = await supabase
+      .from('bots').select('*').eq('id', botId).single();
+
+    if (botError || !botConfig) return res.status(404).json({ error: 'Bot not found.' });
+
+    const systemPrompt = `
+      You are a professional AI assistant for ${botConfig.name}.
+      CRITICAL MISSION: Before answering questions, naturally collect the user's Name, Email, and Phone.
+      BUSINESS KNOWLEDGE: ${botConfig.knowledge || ''}
+      CURRENT PAGE: ${pageContent || ''}
+    `.trim();
+
     const response = await anthropic.messages.create({
-      model: 'claude-instant-1.2',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 1024,
-      messages: messages.map(m => ({ role: m.role, content: m.content }))
+      system: systemPrompt,
+      messages: messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
+        role: m.role,
+        content: m.content
+      }))
     });
 
-    res.json({ text: response.content[0].text });
+    const botReply = response.content[0].text;
+
+    // Background log
+    supabase.from('chat_logs').insert({
+      bot_id: botId,
+      user_message: messages[messages.length - 1].content,
+      bot_reply: botReply
+    }).then(({ error }) => { if (error) console.error('Logging Error:', error); });
+
+    res.json({ text: botReply });
   } catch (error) {
-    res.status(200).json({ text: `⚠️ Error: ${error.message}` });
+    console.error('Claude Error:', error);
+    res.status(200).json({ text: `⚠️ AI Service Error: ${error.message}. Please check your Anthropic API key/credits.` });
   }
 });
 
