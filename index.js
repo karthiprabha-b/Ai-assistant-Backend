@@ -75,7 +75,7 @@ app.post('/api/chat', async (req, res) => {
     } = req.body;
 
     console.log('📩 Incoming Messages:', messages);
-    console.log('🤖 Using Model: claude-3-7-sonnet-latest');
+    console.log('🤖 Using Model: claude-3-5-sonnet-latest');
 
     // Create fresh client each request
     const client = new Anthropic({
@@ -114,7 +114,7 @@ ${pageContent}
 
     // Claude API
     const response = await client.messages.create({
-      model: 'claude-3-7-sonnet-latest',
+      model: 'claude-3-5-sonnet-latest',
       max_tokens: 1024,
       system: instructions,
       messages: formattedMessages
