@@ -75,8 +75,25 @@ app.post('/api/chat', async (req, res) => {
     const {
       messages = [],
       pageContent = '',
-      botId = 'AI Assistant'
+      botId
     } = req.body;
+
+    // 1. Fetch Bot Knowledge from Database
+    let botKnowledge = '';
+    let botName = 'AI Assistant';
+
+    if (botId) {
+      const { data: botData } = await supabase
+        .from('bots')
+        .select('name, knowledge')
+        .eq('id', botId)
+        .single();
+      
+      if (botData) {
+        botKnowledge = botData.knowledge || '';
+        botName = botData.name || 'AI Assistant';
+      }
+    }
 
     const formattedMessages = messages.map((m) => ({
       role: m.role,
@@ -88,7 +105,18 @@ app.post('/api/chat', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You are an AI assistant for ${botId}.\n\nWebsite knowledge:\n${pageContent}`
+          content: `You are a professional AI assistant for ${botName}.
+
+KNOWLEDGE BASE:
+${botKnowledge}
+
+CURRENT PAGE CONTENT (for context):
+${pageContent}
+
+INSTRUCTIONS:
+1. Use the KNOWLEDGE BASE first to answer questions.
+2. If the answer isn't in the knowledge base, use the CURRENT PAGE CONTENT.
+3. Be professional, helpful, and concise.`
         },
         ...formattedMessages
       ],
