@@ -243,7 +243,11 @@ app.post('/api/bots', async (req, res) => {
           bot.icon_size || bot.iconSize,
         knowledge:
           bot.knowledge || bot.context,
-        icon_url: bot.icon_url
+        icon_url: bot.icon_url,
+        widget_width: bot.widget_width,
+        widget_height: bot.widget_height,
+        alignment: bot.alignment,
+        icon_fit: bot.icon_fit
       })
       .select();
 
