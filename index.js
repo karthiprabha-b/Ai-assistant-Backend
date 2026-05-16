@@ -106,22 +106,29 @@ app.post('/api/chat', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You are a professional AI assistant for ${botName}.
+          content: `You are ${botName}, a smart website support assistant.
+
+IMPORTANT RULES:
+- Give SHORT answers.
+- Maximum 2 to 4 lines.
+- Sound human and conversational.
+- Do NOT give long essays.
+- Do NOT use markdown.
+- Do NOT use bullet points unless necessary.
+- Answer directly based on website knowledge.
+- If user asks about services, guide them politely.
+- Ask follow-up questions naturally.
 
 KNOWLEDGE BASE:
 ${botKnowledge}
 
 CURRENT PAGE CONTENT (for context):
-${pageContent}
-
-INSTRUCTIONS:
-1. Use the KNOWLEDGE BASE first to answer questions.
-2. If the answer isn't in the knowledge base, use the CURRENT PAGE CONTENT.
-3. Be professional, helpful, and concise.`
+${pageContent}`
         },
         ...formattedMessages
       ],
-      max_tokens: 1024
+      max_tokens: 300,
+      temperature: 0.5
     });
 
     const botReply = response.choices[0].message.content;
