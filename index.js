@@ -181,32 +181,43 @@ app.get('/api/bots', async (req, res) => {
 // SCRAPE WEBSITE
 // =========================
 
-const scrapeWebsite = async (url) => {
+const scrapeWebsite = async (targetUrl) => {
   try {
+    let url = targetUrl.trim();
+    if (!url.startsWith('http')) {
+      url = `https://${url}`;
+    }
+
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
     
-    if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
+    if (!res.ok) {
+      // Try http if https failed
+      if (url.startsWith('https')) {
+        return scrapeWebsite(url.replace('https', 'http'));
+      }
+      throw new Error(`Failed to fetch: ${res.statusText}`);
+    }
     
     const html = await res.text();
     const $ = cheerio.load(html);
 
     // Remove unwanted elements
-    $('script, style, nav, footer, noscript').remove();
+    $('script, style, nav, footer, noscript, header').remove();
 
     // Get text content
     const text = $('body').text()
       .replace(/\s+/g, ' ')
       .trim()
-      .slice(0, 10000); // Limit to 10k chars
+      .slice(0, 15000); // Increased limit slightly
 
     return text;
   } catch (error) {
     console.error('❌ Scrape Error:', error);
-    return '';
+    throw error;
   }
 };
 
@@ -214,14 +225,18 @@ app.post('/api/scrape', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  console.log(`🔍 Scraping website: ${url}`);
-  const content = await scrapeWebsite(url);
-  
-  if (!content) {
-    return res.status(500).json({ error: 'Could not extract content from website' });
-  }
+  try {
+    console.log(`🔍 Scraping website: ${url}`);
+    const content = await scrapeWebsite(url);
+    
+    if (!content) {
+      return res.status(500).json({ error: 'Could not extract text from this website. It might be blocking automated access.' });
+    }
 
-  res.json({ content });
+    res.json({ content });
+  } catch (err) {
+    res.status(500).json({ error: `Connection failed: ${err.message}. Please check if the URL is correct.` });
+  }
 });
 
 // =========================
