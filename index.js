@@ -116,8 +116,19 @@ ${pageContent}
     const response = await client.messages.create({
       model: 'claude-3-haiku-20240307',
       max_tokens: 1024,
-      system: instructions,
-      messages: formattedMessages
+      messages: [
+        {
+          role: 'user',
+          content: `
+${instructions}
+
+Conversation:
+${formattedMessages
+  .map(m => `${m.role}: ${m.content}`)
+  .join('\n')}
+`
+        }
+      ]
     });
 
     const botReply =
