@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { supabase } from './supabase.js';
+import * as cheerio from 'cheerio';
 
 dotenv.config();
 
@@ -174,6 +175,53 @@ app.get('/api/bots', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// =========================
+// SCRAPE WEBSITE
+// =========================
+
+const scrapeWebsite = async (url) => {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
+    
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // Remove unwanted elements
+    $('script, style, nav, footer, noscript').remove();
+
+    // Get text content
+    const text = $('body').text()
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 10000); // Limit to 10k chars
+
+    return text;
+  } catch (error) {
+    console.error('❌ Scrape Error:', error);
+    return '';
+  }
+};
+
+app.post('/api/scrape', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL is required' });
+
+  console.log(`🔍 Scraping website: ${url}`);
+  const content = await scrapeWebsite(url);
+  
+  if (!content) {
+    return res.status(500).json({ error: 'Could not extract content from website' });
+  }
+
+  res.json({ content });
 });
 
 // =========================
