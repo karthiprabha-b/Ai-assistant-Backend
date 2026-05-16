@@ -60,13 +60,11 @@ console.log(
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const currentKey = process.env.ANTHROPIC_API_KEY || '';
+    const apiKey = process.env.ANTHROPIC_API_KEY;
 
-    if (!currentKey) {
-      return res.status(500).json({
-        text: '❌ Missing ANTHROPIC_API_KEY'
-      });
-    }
+    const anthropic = new Anthropic({
+      apiKey
+    });
 
     const {
       messages = [],
@@ -74,105 +72,35 @@ app.post('/api/chat', async (req, res) => {
       botId = 'AI Assistant'
     } = req.body;
 
-    console.log('📩 Incoming Messages:', messages);
-    console.log('🤖 Using Model: claude-3-haiku-20240307');
+    const formattedMessages = messages.map((m) => ({
+      role: m.role,
+      content: m.content
+    }));
 
-    // Create fresh client each request
-    const client = new Anthropic({
-      apiKey: currentKey
-    });
-
-    // Clean messages
-    const formattedMessages = messages
-      .filter(
-        (m) =>
-          m.role === 'user' ||
-          m.role === 'assistant'
-      )
-      .map((m) => ({
-        role: m.role,
-        content: m.content
-      }));
-
-    // System Prompt
-    const instructions = `
-You are a professional AI assistant for ${botId}.
-
-RULES:
-1. First collect:
-- Name
-- Email
-- Phone Number
-
-2. Then answer user questions professionally.
-
-3. Keep replies concise and friendly.
-
-WEBSITE KNOWLEDGE:
-${pageContent}
-`.trim();
-
-    // Claude API
-    const response = await client.messages.create({
-      model: 'claude-3-haiku-20240307',
+    const response = await anthropic.messages.create({
+      model: 'claude-3-opus-20240229',
       max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `
-${instructions}
+      system: `
+You are an AI assistant for ${botId}.
 
-Conversation:
-${formattedMessages
-  .map(m => `${m.role}: ${m.content}`)
-  .join('\n')}
-`
-        }
-      ]
+Website knowledge:
+${pageContent}
+`,
+      messages: formattedMessages
     });
 
     const botReply =
-      response.content?.[0]?.text ||
-      'No response generated.';
+      response.content[0].text;
 
-    // =========================
-    // SAVE CHAT LOGS
-    // =========================
-
-    try {
-      const userMessage =
-        messages[messages.length - 1]?.content || '';
-
-      await supabase
-        .from('chat_logs')
-        .insert({
-          bot_id: botId,
-          user_message: userMessage,
-          bot_reply: botReply,
-          created_at: new Date().toISOString()
-        });
-
-      console.log('✅ Chat log saved');
-
-    } catch (logError) {
-      console.error(
-        '❌ Supabase Log Error:',
-        logError.message
-      );
-    }
-
-    // Send Response
     res.json({
       text: botReply
     });
 
   } catch (error) {
-    console.error('❌ Claude Error:', error);
+    console.error(error);
 
     res.status(500).json({
-      text:
-        error?.message ||
-        'Internal Server Error'
+      text: JSON.stringify(error)
     });
   }
 });
