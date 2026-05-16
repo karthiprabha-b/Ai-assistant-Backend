@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { supabase } from './supabase.js';
 import * as cheerio from 'cheerio';
+import multer from 'multer';
+import pdf from 'pdf-parse';
+import mammoth from 'mammoth';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 dotenv.config();
 
@@ -89,7 +94,7 @@ app.post('/api/chat', async (req, res) => {
         .select('name, knowledge')
         .eq('id', botId)
         .single();
-      
+
       if (botData) {
         botKnowledge = botData.knowledge || '';
         botName = botData.name || 'AI Assistant';
@@ -112,6 +117,7 @@ IMPORTANT RULES:
 - Give SHORT answers.
 - Maximum 2 to 4 lines.
 - Sound human and conversational.
+- Behave like a profesional Live supporter for site.
 - Do NOT give long essays.
 - Do NOT use markdown.
 - Do NOT use bullet points unless necessary.
@@ -208,6 +214,39 @@ app.get('/api/bots', async (req, res) => {
 });
 
 // =========================
+// FILE UPLOAD & KNOWLEDGE EXTRACTION
+// =========================
+
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const fileType = req.file.originalname.split('.').pop().toLowerCase();
+    let extractedText = '';
+
+    if (fileType === 'pdf') {
+      const data = await pdf(req.file.buffer);
+      extractedText = data.text;
+    } else if (fileType === 'docx') {
+      const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+      extractedText = result.value;
+    } else if (fileType === 'txt') {
+      extractedText = req.file.buffer.toString('utf-8');
+    } else {
+      return res.status(400).json({ error: 'Unsupported file type. Please upload PDF, DOCX, or TXT.' });
+    }
+
+    // Clean up text
+    extractedText = extractedText.replace(/\s+/g, ' ').trim().slice(0, 50000);
+
+    res.json({ text: extractedText, fileName: req.file.originalname });
+  } catch (error) {
+    console.error('Upload Error:', error);
+    res.status(500).json({ error: 'Failed to process file' });
+  }
+});
+
+// =========================
 // SCRAPE WEBSITE
 // =========================
 
@@ -223,7 +262,7 @@ const scrapeWebsite = async (targetUrl) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
-    
+
     if (!res.ok) {
       // Try http if https failed
       if (url.startsWith('https')) {
@@ -231,7 +270,7 @@ const scrapeWebsite = async (targetUrl) => {
       }
       throw new Error(`Failed to fetch: ${res.statusText}`);
     }
-    
+
     const html = await res.text();
     const $ = cheerio.load(html);
 
@@ -258,7 +297,7 @@ app.post('/api/scrape', async (req, res) => {
   try {
     console.log(`🔍 Scraping website: ${url}`);
     const content = await scrapeWebsite(url);
-    
+
     if (!content) {
       return res.status(500).json({ error: 'Could not extract text from this website. It might be blocking automated access.' });
     }
