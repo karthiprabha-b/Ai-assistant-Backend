@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { supabase } from './supabase.js';
 
 dotenv.config();
@@ -37,7 +37,7 @@ app.get('/api/test', (req, res) => {
   res.json({
     status: 'Live',
     version: '3.0',
-    message: 'Claude + Supabase Backend Active'
+    message: 'OpenAI + Supabase Backend Active'
   });
 });
 
@@ -45,12 +45,12 @@ app.get('/api/test', (req, res) => {
 // API KEY CHECK
 // =========================
 
-const apiKey = process.env.ANTHROPIC_API_KEY || '';
+const openaiKey = process.env.OPENAI_API_KEY || '';
 
 console.log(
-  'Anthropic Key:',
-  apiKey
-    ? `${apiKey.substring(0, 12)}...`
+  'OpenAI Key:',
+  openaiKey
+    ? `${openaiKey.substring(0, 12)}...`
     : '❌ MISSING'
 );
 
@@ -60,9 +60,15 @@ console.log(
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
 
-    const anthropic = new Anthropic({
+    if (!apiKey) {
+      return res.status(500).json({
+        text: '❌ Missing OPENAI_API_KEY'
+      });
+    }
+
+    const openai = new OpenAI({
       apiKey
     });
 
@@ -77,20 +83,35 @@ app.post('/api/chat', async (req, res) => {
       content: m.content
     }));
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-opus-20240229',
-      max_tokens: 1024,
-      system: `
-You are an AI assistant for ${botId}.
-
-Website knowledge:
-${pageContent}
-`,
-      messages: formattedMessages
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an AI assistant for ${botId}.\n\nWebsite knowledge:\n${pageContent}`
+        },
+        ...formattedMessages
+      ],
+      max_tokens: 1024
     });
 
-    const botReply =
-      response.content[0].text;
+    const botReply = response.choices[0].message.content;
+
+    // =========================
+    // SAVE CHAT LOGS
+    // =========================
+    try {
+      const userMessage = messages[messages.length - 1]?.content || '';
+      await supabase.from('chat_logs').insert({
+        bot_id: botId,
+        user_message: userMessage,
+        bot_reply: botReply,
+        created_at: new Date().toISOString()
+      });
+      console.log('✅ Chat log saved');
+    } catch (logError) {
+      console.error('❌ Supabase Log Error:', logError.message);
+    }
 
     res.json({
       text: botReply
@@ -98,9 +119,8 @@ ${pageContent}
 
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
-      text: JSON.stringify(error)
+      text: error.message || 'Internal Server Error'
     });
   }
 });
