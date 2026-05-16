@@ -162,6 +162,29 @@ ${pageContent}`
 });
 
 // =========================
+// SAVE LEAD
+// =========================
+
+app.post('/api/leads', async (req, res) => {
+  try {
+    const { botId, name, email, phone } = req.body;
+
+    const { error } = await supabase.from('chat_logs').insert({
+      bot_id: botId,
+      user_message: `🚨 NEW LEAD: ${name}`,
+      bot_reply: `Email: ${email} | Phone: ${phone}`,
+      created_at: new Date().toISOString()
+    });
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Lead Save Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =========================
 // GET ALL BOTS
 // =========================
 
