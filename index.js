@@ -81,6 +81,7 @@ app.post('/api/chat', async (req, res) => {
     const {
       messages = [],
       pageContent = '',
+      fileContent = '',
       botId
     } = req.body;
 
@@ -129,7 +130,11 @@ KNOWLEDGE BASE:
 ${botKnowledge}
 
 CURRENT PAGE CONTENT (for context):
-${pageContent}`
+${pageContent}
+
+${fileContent ? `USER UPLOADED FILE CONTENT:
+${fileContent}
+(Please refer to this document content if the user asks about it.)` : ''}`
         },
         ...formattedMessages
       ],
