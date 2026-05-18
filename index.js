@@ -201,9 +201,15 @@ app.post('/api/leads', async (req, res) => {
 
 app.get('/api/bots', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('bots')
-      .select('*');
+    const { userId } = req.query;
+    let query = supabase.from('bots').select('*');
+    
+    if (userId) {
+      // Find bots that belong to this user (stored inside icon_fit)
+      query = query.like('icon_fit', `%${userId}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -336,7 +342,7 @@ app.post('/api/bots', async (req, res) => {
         widget_width: bot.widget_width,
         widget_height: bot.widget_height,
         alignment: bot.alignment,
-        icon_fit: bot.icon_fit
+        icon_fit: bot.user_id ? `${bot.icon_fit || 'cover'},${bot.user_id}` : bot.icon_fit
       })
       .select();
 
