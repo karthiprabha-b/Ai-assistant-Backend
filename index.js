@@ -336,7 +336,8 @@ app.post('/api/bots', async (req, res) => {
         widget_width: bot.widget_width,
         widget_height: bot.widget_height,
         alignment: bot.alignment,
-        icon_fit: bot.icon_fit
+        icon_fit: bot.icon_fit,
+        shape: bot.shape
       })
       .select();
 
