@@ -5,7 +5,7 @@ import OpenAI from 'openai';
 import { supabase } from './supabase.js';
 import * as cheerio from 'cheerio';
 import multer from 'multer';
-import pdf from 'pdf-parse';
+import pdf from 'pdf-parse-debugging-disabled';
 import mammoth from 'mammoth';
 
 const upload = multer({ storage: multer.memoryStorage() });
