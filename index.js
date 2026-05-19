@@ -225,6 +225,82 @@ app.get('/api/bots', async (req, res) => {
 });
 
 // =========================
+// BOT SUGGESTIONS GENERATION
+// =========================
+
+app.get('/api/bots/:id/suggestions', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: bot, error } = await supabase
+      .from('bots')
+      .select('knowledge')
+      .eq('id', id)
+      .single();
+
+    if (error || !bot || !bot.knowledge) {
+      return res.json([
+        "Tell me about your services",
+        "How can I contact you?",
+        "What are your working hours?",
+        "Where are you located?"
+      ]);
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.json([
+        "Tell me about your services",
+        "How can I contact you?",
+        "What are your working hours?",
+        "Where are you located?"
+      ]);
+    }
+
+    const openai = new OpenAI({ apiKey });
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an AI assistant analyzing a website's knowledge base.
+Based on the text below, generate 3 to 4 very short, helpful suggestion questions that a visitor might ask.
+Each suggestion must be brief (max 4-5 words) and highly relevant.
+Return ONLY a valid JSON array of strings. Do not use markdown blocks, backticks, or any conversational text. Example output: ["How to apply?", "Contact sales", "Pricing plans"]
+
+Knowledge base:
+${bot.knowledge.slice(0, 3000)}`
+        }
+      ],
+      max_tokens: 150,
+      temperature: 0.7
+    });
+
+    let suggestions;
+    try {
+      suggestions = JSON.parse(response.choices[0].message.content.trim());
+    } catch (e) {
+      const text = response.choices[0].message.content.trim();
+      const match = text.match(/\[.*\]/s);
+      if (match) {
+        suggestions = JSON.parse(match[0]);
+      } else {
+        throw new Error("Failed to parse AI response");
+      }
+    }
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Suggestions error:", error);
+    res.json([
+      "Tell me about your services",
+      "How can I contact you?",
+      "What are your working hours?",
+      "Where are you located?"
+    ]);
+  }
+});
+
+// =========================
 // FILE UPLOAD & KNOWLEDGE EXTRACTION
 // =========================
 
