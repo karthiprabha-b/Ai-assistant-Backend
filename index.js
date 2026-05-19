@@ -402,6 +402,23 @@ app.post('/api/scrape', async (req, res) => {
 app.post('/api/bots', async (req, res) => {
   try {
     const bot = req.body;
+    const userId = bot.user_id;
+
+    if (!bot.id && userId) {
+      const { data: existingBots, error: countError } = await supabase
+        .from('bots')
+        .select('id, icon_fit');
+
+      if (countError) throw countError;
+
+      const userBots = existingBots.filter(b => b.icon_fit && b.icon_fit.includes(userId));
+
+      if (userBots.length >= 5) {
+        return res.status(400).json({
+          error: "Limit Reached: You can create up to 5 bots only."
+        });
+      }
+    }
 
     const { data, error } = await supabase
       .from('bots')
